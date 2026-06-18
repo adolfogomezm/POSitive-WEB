@@ -1,0 +1,243 @@
+---
+let tickets = [];
+let error = null;
+let uniqueCategories = [];
+
+try {
+  const res = await fetch('http://localhost:3000/api/tickets');
+  const data = await res.json();
+  if (data && data.ok) {
+    tickets = data.tickets || [];
+    
+    // Extraer categorías únicas de todos los tickets
+    const catSet = new Set();
+    tickets.forEach(ticket => {
+      if(ticket.products) {
+        ticket.products.forEach(p => {
+          if(p.categoryName) catSet.add(p.categoryName);
+        });
+      }
+    });
+    uniqueCategories = Array.from(catSet);
+  }
+} catch (e) {
+  error = 'No se pudo conectar con la API de tickets.';
+}
+
+const calculateTotalItems = (products) => {
+  if (!products) return 0;
+  return products.reduce((acc, curr) => acc + curr.quantity, 0);
+};
+
+const getTicketCategories = (products) => {
+  if (!products) return "";
+  return products.map(p => p.categoryName).join(',');
+};
+---
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+  <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="flex items-center gap-3">
+      <h3 class="text-lg font-medium text-gray-900">Ventas Recientes</h3>
+      <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full" id="tickets-count">{tickets.length} Tickets</span>
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <label for="filter-tickets-category" class="text-sm font-medium text-gray-700">Categoría:</label>
+      <select id="filter-tickets-category" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 outline-none">
+        <option value="all">Todas las categorías</option>
+        {uniqueCategories.map(cat => (
+          <option value={cat}>{cat}</option>
+        ))}
+      </select>
+    </div>
+  </div>
+  
+  {error ? (
+    <div class="p-6 text-center text-red-500">{error}</div>
+  ) : tickets.length === 0 ? (
+    <div class="p-6 text-center text-gray-500">No hay ventas registradas.</div>
+  ) : (
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+          <tr>
+            <th scope="col" class="px-6 py-3">Fecha</th>
+            <th scope="col" class="px-6 py-3 text-center">Artículos</th>
+            <th scope="col" class="px-6 py-3 text-right">Total</th>
+            <th scope="col" class="px-6 py-3 text-center">Acción</th>
+          </tr>
+        </thead>
+        <tbody id="tickets-tbody">
+          {tickets.map((ticket) => (
+            <tr class="border-b border-gray-200 hover:bg-gray-50 ticket-row" data-categories={getTicketCategories(ticket.products)}>
+              <td class="px-6 py-4 whitespace-nowrap">
+                {new Date(ticket.created_at).toLocaleString()}
+              </td>
+              <td class="px-6 py-4 text-center font-medium">
+                {calculateTotalItems(ticket.products)}
+              </td>
+              <td class="px-6 py-4 text-right font-medium text-gray-900">
+                ${ticket.finalPrice}
+              </td>
+              <td class="px-6 py-4 text-center">
+                <button 
+                  class="view-details-btn text-blue-600 hover:text-blue-800 font-medium text-xs transition-colors"
+                  data-ticket={JSON.stringify(ticket)}
+                >
+                  Ver detalles
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</div>
+
+<!-- Modal para ver detalles del ticket -->
+<dialog id="ticket-modal" class="rounded-xl shadow-2xl p-0 backdrop:bg-black/50 w-full max-w-2xl bg-white border border-gray-200">
+  <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+    <h3 class="text-lg font-bold text-gray-900" id="modal-ticket-id">Detalles del Ticket</h3>
+    <button id="close-modal-btn" class="text-gray-400 hover:text-gray-600 focus:outline-none transition-colors">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+    </button>
+  </div>
+  <div class="p-6">
+    <div class="mb-4 text-sm text-gray-600 flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
+      <div class="flex flex-col">
+        <span class="text-xs text-blue-600 uppercase font-bold tracking-wider">Fecha de Venta</span>
+        <span id="modal-ticket-date" class="font-medium text-gray-900"></span>
+      </div>
+      <div class="flex flex-col items-end">
+        <span class="text-xs text-blue-600 uppercase font-bold tracking-wider">Total</span>
+        <span class="text-xl font-bold text-gray-900" id="modal-ticket-total"></span>
+      </div>
+    </div>
+    
+    <h4 class="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Productos Vendidos</h4>
+    <div class="overflow-x-auto border border-gray-200 rounded-lg">
+      <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+          <tr>
+            <th class="px-4 py-3">Producto</th>
+            <th class="px-4 py-3 text-center">Cant.</th>
+            <th class="px-4 py-3 text-right">P. Unitario</th>
+            <th class="px-4 py-3 text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody id="modal-products-list">
+          <!-- Llenado dinámicamente por JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</dialog>
+
+<style>
+  /* Evitar scroll en el body cuando el modal está abierto */
+  :global(body:has(dialog[open])) {
+    overflow: hidden;
+  }
+  
+  dialog::backdrop {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+  }
+</style>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const filterSelect = document.getElementById('filter-tickets-category');
+    const rows = document.querySelectorAll('.ticket-row');
+    const countBadge = document.getElementById('tickets-count');
+
+    // Lógica del filtro
+    if (filterSelect) {
+      filterSelect.addEventListener('change', (e) => {
+        const selectedCat = e.target.value;
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+          const categories = row.getAttribute('data-categories') || "";
+          if (selectedCat === 'all' || categories.includes(selectedCat)) {
+            row.style.display = '';
+            visibleCount++;
+          } else {
+            row.style.display = 'none';
+          }
+        });
+        
+        if (countBadge) {
+          countBadge.textContent = `${visibleCount} Tickets`;
+        }
+      });
+    }
+
+    // Lógica del Modal
+    const modal = document.getElementById('ticket-modal') as HTMLDialogElement;
+    const closeBtn = document.getElementById('close-modal-btn');
+    const detailButtons = document.querySelectorAll('.view-details-btn');
+
+    const modalId = document.getElementById('modal-ticket-id');
+    const modalDate = document.getElementById('modal-ticket-date');
+    const modalTotal = document.getElementById('modal-ticket-total');
+    const modalProducts = document.getElementById('modal-products-list');
+
+    detailButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const ticketStr = btn.getAttribute('data-ticket');
+        if (!ticketStr) return;
+        
+        const ticket = JSON.parse(ticketStr);
+        
+        if(modalId) modalId.textContent = `Ticket: ${ticket.idTicketLocal.substring(0, 8)}...`;
+        if(modalDate) modalDate.textContent = new Date(ticket.created_at).toLocaleString();
+        if(modalTotal) modalTotal.textContent = `$${parseFloat(ticket.finalPrice).toFixed(2)}`;
+        
+        if(modalProducts) {
+          modalProducts.innerHTML = '';
+          if (ticket.products && ticket.products.length > 0) {
+            ticket.products.forEach(p => {
+              const tr = document.createElement('tr');
+              tr.className = 'border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors';
+              tr.innerHTML = `
+                <td class="px-4 py-3 font-medium text-gray-900">
+                  ${p.productName} 
+                  <div class="text-xs font-normal text-gray-500 mt-0.5">${p.categoryName || ''}</div>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span class="bg-gray-100 text-gray-800 text-xs font-medium px-2 py-0.5 rounded-full border border-gray-200">x${p.quantity}</span>
+                </td>
+                <td class="px-4 py-3 text-right text-gray-500">$${parseFloat(p.unitaryPrice).toFixed(2)}</td>
+                <td class="px-4 py-3 text-right font-medium text-gray-900">$${parseFloat(p.total).toFixed(2)}</td>
+              `;
+              modalProducts.appendChild(tr);
+            });
+          } else {
+            modalProducts.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-gray-500">No hay productos en este ticket</td></tr>`;
+          }
+        }
+
+        modal?.showModal();
+      });
+    });
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        modal?.close();
+      });
+    }
+
+    // Cerrar al hacer clic fuera del modal (en el backdrop)
+    if(modal) {
+      modal.addEventListener('click', (e) => {
+        const rect = modal.getBoundingClientRect();
+        if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+          modal.close();
+        }
+      });
+    }
+  });
+</script>

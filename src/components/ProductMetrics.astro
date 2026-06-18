@@ -1,0 +1,110 @@
+---
+let tickets = [];
+let error = null;
+
+try {
+  const res = await fetch("http://localhost:3000/api/tickets");
+  const data = await res.json();
+  if (data && data.ok) {
+    tickets = data.tickets || [];
+  }
+} catch (e) {
+  error = "No se pudieron cargar las métricas de productos.";
+}
+
+// Calcular métricas de productos
+const productStats = {}; 
+
+tickets.forEach((ticket) => {
+  if (!ticket.products) return;
+  
+  // Para la moda (frecuencia), queremos contar 1 por ticket aunque compren varias unidades
+  const productsInThisTicket = new Set();
+  
+  ticket.products.forEach((p) => {
+    if (!productStats[p.productName]) {
+      productStats[p.productName] = { frequency: 0, quantitySold: 0, revenue: 0 };
+    }
+    
+    productsInThisTicket.add(p.productName);
+    productStats[p.productName].quantitySold += p.quantity;
+    productStats[p.productName].revenue += parseFloat(p.total || 0);
+  });
+  
+  productsInThisTicket.forEach((name) => {
+    productStats[name].frequency += 1;
+  });
+});
+
+let topFrequencyProduct = { name: "N/A", value: 0 };
+let topSoldProduct = { name: "N/A", value: 0 };
+let leastSoldProduct = { name: "N/A", value: Infinity };
+let topRevenueProduct = { name: "N/A", value: 0 };
+
+Object.entries(productStats).forEach(([name, stats]) => {
+  if (stats.frequency > topFrequencyProduct.value) {
+    topFrequencyProduct = { name, value: stats.frequency };
+  }
+  if (stats.quantitySold > topSoldProduct.value) {
+    topSoldProduct = { name, value: stats.quantitySold };
+  }
+  if (stats.quantitySold < leastSoldProduct.value) {
+    leastSoldProduct = { name, value: stats.quantitySold };
+  }
+  if (stats.revenue > topRevenueProduct.value) {
+    topRevenueProduct = { name, value: stats.revenue };
+  }
+});
+
+if (leastSoldProduct.value === Infinity) leastSoldProduct.value = 0;
+---
+
+{error ? (
+  <div class="bg-red-50 text-red-500 p-4 rounded-lg border border-red-200 mb-8 text-sm">
+    {error}
+  </div>
+) : (
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    
+    <!-- Métrica 1: Moda por Ticket -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-center relative overflow-hidden">
+      <div class="absolute inset-0 bg-blue-50 opacity-20"></div>
+      <div class="relative z-10">
+        <h4 class="text-xs font-medium text-blue-600 uppercase tracking-wider mb-1">Top Frecuencia</h4>
+        <span class="text-xl font-bold text-gray-900 block truncate" title={topFrequencyProduct.name}>{topFrequencyProduct.name}</span>
+        <span class="text-sm font-medium text-gray-500">En {topFrequencyProduct.value} tickets</span>
+      </div>
+    </div>
+
+    <!-- Métrica 2: Más Vendido (Volumen) -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-center relative overflow-hidden">
+      <div class="absolute inset-0 bg-green-50 opacity-30"></div>
+      <div class="relative z-10">
+        <h4 class="text-xs font-medium text-green-700 uppercase tracking-wider mb-1">Mayor Volumen</h4>
+        <span class="text-xl font-bold text-gray-900 block truncate" title={topSoldProduct.name}>{topSoldProduct.name}</span>
+        <span class="text-sm font-medium text-gray-500">{topSoldProduct.value} unidades vendidas</span>
+      </div>
+    </div>
+
+    <!-- Métrica 3: Menos Vendido -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-center relative overflow-hidden">
+      <div class="absolute inset-0 bg-red-50 opacity-30"></div>
+      <div class="relative z-10">
+        <h4 class="text-xs font-medium text-red-700 uppercase tracking-wider mb-1">Menor Volumen</h4>
+        <span class="text-xl font-bold text-gray-900 block truncate" title={leastSoldProduct.name}>{leastSoldProduct.name}</span>
+        <span class="text-sm font-medium text-gray-500">{leastSoldProduct.value} unidades vendidas</span>
+      </div>
+    </div>
+
+    <!-- Métrica 4: Top Ingresos -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col justify-center relative overflow-hidden">
+      <div class="absolute inset-0 bg-yellow-50 opacity-40"></div>
+      <div class="relative z-10">
+        <h4 class="text-xs font-medium text-yellow-700 uppercase tracking-wider mb-1">Top Ingresos</h4>
+        <span class="text-xl font-bold text-gray-900 block truncate" title={topRevenueProduct.name}>{topRevenueProduct.name}</span>
+        <span class="text-sm font-medium text-gray-500">Ganancia: ${topRevenueProduct.value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+      </div>
+    </div>
+
+  </div>
+)}

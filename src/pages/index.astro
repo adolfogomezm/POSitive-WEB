@@ -1,0 +1,334 @@
+---
+import Layout from "../layouts/Layout.astro";
+import AlertBanner from "../components/AlertBanner.astro";
+
+let inventory = [];
+let tickets = [];
+let products = [];
+let error = null;
+
+try {
+  const [resInv, resTick, resProd] = await Promise.all([
+    fetch("http://localhost:3000/api/inventory"),
+    fetch("http://localhost:3000/api/tickets"),
+    fetch("http://localhost:3000/api/products"),
+  ]);
+
+  if (resInv.ok) inventory = (await resInv.json()).inventory || [];
+  if (resTick.ok) tickets = (await resTick.json()).tickets || [];
+  if (resProd.ok) products = (await resProd.json()).products || [];
+} catch (e) {
+  error = "Hubo un error cargando el resumen del dashboard.";
+}
+
+// Alertas de inventario bajo
+const lowStockProducts = products
+  .filter((p) => p.quantity < 30)
+  .sort((a, b) => a.quantity - b.quantity);
+
+// Cálculo de Costos (más alto últimos 3 meses)
+const threeMonthsAgo = new Date();
+threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+const costMap = {};
+inventory.forEach((inv) => {
+  const invDate = new Date(inv.purchaseDate);
+  const name = inv.productName;
+  const price = parseFloat(inv.unitaryPrice);
+  if (!costMap[name]) costMap[name] = { cost: price, date: invDate };
+  if (invDate >= threeMonthsAgo && price > costMap[name].cost) {
+    costMap[name].cost = price;
+  }
+});
+
+// Cálculos del Mes Actual
+const now = new Date();
+const currentMonth = now.getMonth();
+const currentYear = now.getFullYear();
+
+let netProfitThisMonth = 0;
+let grossRevenueThisMonth = 0;
+let ticketsThisMonthCount = 0;
+const productSalesThisMonth = {};
+
+tickets.forEach((ticket) => {
+  const d = new Date(ticket.created_at);
+  if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+    ticketsThisMonthCount++;
+
+    if (ticket.products) {
+      ticket.products.forEach((p) => {
+        const rev = parseFloat(p.total || 0);
+        grossRevenueThisMonth += rev;
+
+        const cost = costMap[p.productName] ? costMap[p.productName].cost : 0;
+        netProfitThisMonth += rev - cost * p.quantity;
+
+        if (!productSalesThisMonth[p.productName])
+          productSalesThisMonth[p.productName] = 0;
+        productSalesThisMonth[p.productName] += p.quantity;
+      });
+    }
+  }
+});
+
+let topSellingProductName = "N/A";
+let topSellingProductQty = 0;
+Object.entries(productSalesThisMonth).forEach(([name, qty]) => {
+  if (qty > topSellingProductQty) {
+    topSellingProductQty = qty;
+    topSellingProductName = name;
+  }
+});
+
+// Cálculos de Ganancias Generales
+let topMarginProductName = "N/A";
+let topMarginValue = -Infinity;
+
+products.forEach((p) => {
+  const cost = costMap[p.name] ? costMap[p.name].cost : 0;
+  const price = parseFloat(p.price);
+  const absoluteProfit = price - cost;
+  const margin = price > 0 ? (absoluteProfit / price) * 100 : 0;
+
+  if (margin > topMarginValue) {
+    topMarginValue = margin;
+    topMarginProductName = p.name;
+  }
+});
+
+if (topMarginValue === -Infinity) topMarginValue = 0;
+
+const latestTickets = [...tickets]
+  .sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  )
+  .slice(0, 5);
+
+const formatMoney = (val) =>
+  "$" +
+  val.toLocaleString("es-MX", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+---
+
+<Layout>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-6">
+      {
+        lowStockProducts
+          .slice(0, 3)
+          .map((p, idx) => (
+            <AlertBanner
+              id={`stock-${idx}`}
+              title={`Inventario Bajo: ${p.name}`}
+              description={`Solo quedan ${p.quantity} unidades en existencia. Es momento de resurtir.`}
+              index={idx + 1}
+              total={Math.min(lowStockProducts.length, 3)}
+            />
+          ))
+      }
+      {
+        lowStockProducts.length > 3 && (
+          <div class="text-right mt-2 mb-4">
+            <a href="/productos" class="text-sm text-blue-600 hover:underline">
+              Ver {lowStockProducts.length - 3} alertas más en Inventario &rarr;
+            </a>
+          </div>
+        )
+      }
+    </div>
+
+    {
+      error && (
+        <div class="bg-red-50 text-red-500 p-4 rounded-lg mb-8">{error}</div>
+      )
+    }
+
+    <div
+      class="bg-gradient-to-br from-blue-900 to-blue-800 rounded-2xl shadow-xl overflow-hidden mb-8 text-white relative"
+    >
+      <div class="absolute top-0 right-0 p-12 opacity-10 pointer-events-none">
+        <svg class="w-48 h-48" fill="currentColor" viewBox="0 0 24 24"
+          ><path
+            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z"
+          ></path></svg
+        >
+      </div>
+
+      <div class="p-8 relative z-10">
+        <h2
+          class="text-blue-200 font-medium tracking-wide uppercase text-sm mb-2"
+        >
+          Ganancia Neta del Mes Actual
+        </h2>
+        <div class="text-5xl sm:text-6xl font-extrabold mb-2">
+          {formatMoney(netProfitThisMonth)}
+        </div>
+        <p class="text-blue-200 text-sm flex items-center gap-2">
+          Dinero libre ingresado a caja en lo que va del mes.
+        </p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <a
+        href="/ventas"
+        class="block bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow group"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h3
+            class="font-bold text-gray-900 group-hover:text-blue-600 transition-colors"
+          >
+            Resumen de Ventas
+          </h3>
+          <span
+            class="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded-full font-medium"
+            >Este mes</span
+          >
+        </div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-end">
+            <span class="text-gray-500 text-sm">Ingreso Bruto</span>
+            <span class="font-semibold text-gray-900"
+              >{formatMoney(grossRevenueThisMonth)}</span
+            >
+          </div>
+          <div class="flex justify-between items-end">
+            <span class="text-gray-500 text-sm">Tickets Cobrados</span>
+            <span class="font-semibold text-gray-900"
+              >{ticketsThisMonthCount}</span
+            >
+          </div>
+        </div>
+      </a>
+
+      <a
+        href="/productos"
+        class="block bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow group"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h3
+            class="font-bold text-gray-900 group-hover:text-blue-600 transition-colors"
+          >
+            Resumen Inventario
+          </h3>
+          <span
+            class="bg-purple-50 text-purple-600 text-xs px-2 py-1 rounded-full font-medium"
+            >Global</span
+          >
+        </div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-end">
+            <span class="text-gray-500 text-sm">Estrella del Mes</span>
+            <span
+              class="font-semibold text-gray-900 text-right max-w-[120px] truncate"
+              title={topSellingProductName}>{topSellingProductName}</span
+            >
+          </div>
+          <div class="flex justify-between items-end">
+            <span class="text-gray-500 text-sm">Total Catálogo</span>
+            <span class="font-semibold text-gray-900"
+              >{products.length} productos</span
+            >
+          </div>
+        </div>
+      </a>
+
+      <a
+        href="/ganancias"
+        class="block bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow group"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h3
+            class="font-bold text-gray-900 group-hover:text-blue-600 transition-colors"
+          >
+            Resumen Ganancias
+          </h3>
+          <span
+            class="bg-green-50 text-green-600 text-xs px-2 py-1 rounded-full font-medium"
+            >Histórico</span
+          >
+        </div>
+        <div class="space-y-3">
+          <div class="flex justify-between items-end">
+            <span class="text-gray-500 text-sm">Mejor Margen</span>
+            <span
+              class="font-semibold text-gray-900 text-right max-w-[120px] truncate"
+              title={topMarginProductName}>{topMarginProductName}</span
+            >
+          </div>
+          <div class="flex justify-between items-end">
+            <span class="text-gray-500 text-sm">Utilidad</span>
+            <span class="font-bold text-green-600"
+              >{topMarginValue.toFixed(1)}%</span
+            >
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <div
+      class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+    >
+      <div
+        class="px-6 py-4 border-b border-gray-200 flex justify-between items-center"
+      >
+        <h3 class="text-lg font-bold text-gray-900">Actividad Reciente</h3>
+        <a
+          href="/ventas"
+          class="text-sm font-medium text-blue-600 hover:text-blue-800"
+          >Ver todas &rarr;</a
+        >
+      </div>
+
+      {
+        latestTickets.length === 0 ? (
+          <div class="p-6 text-center text-gray-500">
+            No hay ventas registradas aún.
+          </div>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left text-gray-600">
+              <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3">ID Ticket</th>
+                  <th class="px-6 py-3">Fecha</th>
+                  <th class="px-6 py-3 text-center">Artículos</th>
+                  <th class="px-6 py-3 text-right">Total Cobrado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {latestTickets.map((ticket) => {
+                  const totalItems = ticket.products
+                    ? ticket.products.reduce((acc, p) => acc + p.quantity, 0)
+                    : 0;
+                  return (
+                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                      <td class="px-6 py-3 font-mono text-xs text-gray-500">
+                        {ticket.idTicketLocal.substring(0, 8)}
+                      </td>
+                      <td class="px-6 py-3">
+                        {new Date(ticket.created_at).toLocaleString()}
+                      </td>
+                      <td class="px-6 py-3 text-center">
+                        <span class="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded-full">
+                          {totalItems}
+                        </span>
+                      </td>
+                      <td class="px-6 py-3 text-right font-medium text-gray-900">
+                        {formatMoney(parseFloat(ticket.finalPrice))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </div>
+  </main>
+</Layout>

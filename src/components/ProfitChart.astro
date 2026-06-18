@@ -1,0 +1,145 @@
+---
+let inventory = [];
+let tickets = [];
+let error = null;
+
+try {
+  const [resInv, resTick] = await Promise.all([
+    fetch("http://localhost:3000/api/inventory"),
+    fetch("http://localhost:3000/api/tickets")
+  ]);
+  const dataInv = await resInv.json();
+  const dataTick = await resTick.json();
+  
+  if (dataInv && dataInv.ok) inventory = dataInv.inventory || [];
+  if (dataTick && dataTick.ok) tickets = dataTick.tickets || [];
+} catch (e) {
+  error = "No se pudieron cargar los datos para la gráfica de ganancias.";
+}
+
+const threeMonthsAgo = new Date();
+threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+const costMap = {};
+inventory.forEach(inv => {
+  const invDate = new Date(inv.purchaseDate);
+  const name = inv.productName;
+  const price = parseFloat(inv.unitaryPrice);
+  if (!costMap[name]) costMap[name] = { cost: price, date: invDate };
+  if (invDate >= threeMonthsAgo && price > costMap[name].cost) {
+    costMap[name].cost = price;
+  }
+});
+---
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden p-6">
+  <div class="mb-6">
+    <h3 class="text-lg font-bold text-gray-900">Ganancias Netas por Mes</h3>
+    <p class="text-sm text-gray-500">
+      Ingresos totales en ventas menos el costo de los productos vendidos
+    </p>
+  </div>
+
+  {error ? (
+    <div class="text-red-500 text-center py-10">{error}</div>
+  ) : (
+    <div id="profit-monthly-chart" class="w-full h-[300px]"></div>
+  )}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/apexcharts" defer></script>
+
+<script define:vars={{ tickets, costMap }}>
+  document.addEventListener("astro:page-load", () => {
+    const initChart = () => {
+      if (typeof ApexCharts === "undefined") {
+        setTimeout(initChart, 100);
+        return;
+      }
+
+      const monthlyProfits = {};
+
+      tickets.forEach(ticket => {
+        const d = new Date(ticket.created_at);
+        // Formato YYYY-MM para agrupar por mes
+        const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (!monthlyProfits[monthKey]) {
+          monthlyProfits[monthKey] = 0;
+        }
+
+        if (ticket.products) {
+          ticket.products.forEach(p => {
+            const revenue = parseFloat(p.total || 0);
+            const costPerUnit = costMap[p.productName] ? costMap[p.productName].cost : 0;
+            const cogs = costPerUnit * p.quantity;
+            const profit = revenue - cogs;
+            
+            monthlyProfits[monthKey] += profit;
+          });
+        }
+      });
+
+      const sortedMonths = Object.keys(monthlyProfits).sort();
+      const seriesData = sortedMonths.map(m => Number(monthlyProfits[m].toFixed(2)));
+
+      const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+      const formattedMonths = sortedMonths.map(m => {
+        const [year, month] = m.split('-');
+        return `${monthNames[parseInt(month) - 1]} ${year}`;
+      });
+
+      const options = {
+        series: [{
+          name: 'Ganancia Neta Libre',
+          data: seriesData
+        }],
+        chart: {
+          type: 'bar',
+          height: 300,
+          fontFamily: 'inherit',
+          toolbar: { show: false }
+        },
+        colors: ['#10b981'], // Verde para representar dinero/ganancia
+        plotOptions: {
+          bar: {
+            borderRadius: 4,
+            columnWidth: '40%',
+          }
+        },
+        dataLabels: { enabled: false },
+        xaxis: {
+          categories: formattedMonths.length > 0 ? formattedMonths : ["Sin datos"],
+          labels: { style: { colors: '#6b7280', fontSize: '12px' } },
+          axisBorder: { show: false },
+          axisTicks: { show: false }
+        },
+        yaxis: {
+          labels: {
+            style: { colors: '#6b7280', fontSize: '12px' },
+            formatter: function (val) {
+              return "$" + val.toLocaleString('es-MX', { minimumFractionDigits: 2 });
+            }
+          }
+        },
+        tooltip: {
+          y: {
+            formatter: function (val) {
+              return "$" + val.toLocaleString('es-MX', { minimumFractionDigits: 2 });
+            }
+          }
+        },
+        grid: {
+          borderColor: '#f3f4f6',
+          strokeDashArray: 4,
+          yaxis: { lines: { show: true } }
+        }
+      };
+
+      const chart = new ApexCharts(document.querySelector("#profit-monthly-chart"), options);
+      chart.render();
+    };
+
+    initChart();
+  });
+</script>

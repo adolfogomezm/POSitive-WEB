@@ -1,0 +1,128 @@
+---
+let products = [];
+let categoriesMap = {};
+let uniqueCategories = [];
+let error = null;
+
+try {
+  const [resProducts, resCategories] = await Promise.all([
+    fetch('http://localhost:3000/api/products'),
+    fetch('http://localhost:3000/api/category')
+  ]);
+  
+  const dataProd = await resProducts.json();
+  const dataCat = await resCategories.json();
+  
+  if (dataCat && dataCat.ok) {
+    dataCat.categorys.forEach(c => {
+      categoriesMap[c.idCategory] = c.name;
+    });
+  }
+  
+  if (dataProd && dataProd.ok) {
+    products = dataProd.products || [];
+    
+    // Extraer nombres de categorías únicos de los productos
+    const catSet = new Set();
+    products.forEach(p => {
+      const catName = categoriesMap[p.idCategory] || "Sin categoría";
+      p.categoryName = catName;
+      catSet.add(catName);
+    });
+    uniqueCategories = Array.from(catSet);
+  }
+} catch (e) {
+  error = 'No se pudo conectar con las APIs de inventario.';
+}
+---
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+  <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="flex items-center gap-3">
+      <h3 class="text-lg font-medium text-gray-900">Inventario de Productos</h3>
+      <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full" id="products-count">{products.length} Productos</span>
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <label for="filter-products-category" class="text-sm font-medium text-gray-700">Categoría:</label>
+      <select id="filter-products-category" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 outline-none">
+        <option value="all">Todas las categorías</option>
+        {uniqueCategories.map(cat => (
+          <option value={cat}>{cat}</option>
+        ))}
+      </select>
+    </div>
+  </div>
+  
+  {error ? (
+    <div class="p-6 text-center text-red-500">{error}</div>
+  ) : products.length === 0 ? (
+    <div class="p-6 text-center text-gray-500">No hay productos disponibles.</div>
+  ) : (
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+          <tr>
+            <th scope="col" class="px-6 py-3">Producto</th>
+            <th scope="col" class="px-6 py-3">Categoría</th>
+            <th scope="col" class="px-6 py-3 text-center">Stock</th>
+            <th scope="col" class="px-6 py-3 text-right">Precio Unitario</th>
+            <th scope="col" class="px-6 py-3 text-center">Última Act.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((prod) => (
+            <tr class="border-b border-gray-200 hover:bg-gray-50 product-row" data-category={prod.categoryName}>
+              <td class="px-6 py-4 font-medium text-gray-900">
+                {prod.name}
+              </td>
+              <td class="px-6 py-4 text-gray-500">
+                {prod.categoryName}
+              </td>
+              <td class="px-6 py-4 text-center">
+                <span class={`px-2 py-1 rounded-full text-xs font-medium ${prod.quantity < 30 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                  {prod.quantity}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-right font-medium">
+                ${prod.price}
+              </td>
+              <td class="px-6 py-4 text-center text-gray-500 text-xs">
+                {new Date(prod.updated_at).toLocaleDateString()}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</div>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const filterSelectProd = document.getElementById('filter-products-category');
+    const rowsProd = document.querySelectorAll('.product-row');
+    const countBadgeProd = document.getElementById('products-count');
+
+    if (filterSelectProd) {
+      filterSelectProd.addEventListener('change', (e) => {
+        const selectedCat = e.target.value;
+        let visibleCount = 0;
+        
+        rowsProd.forEach(row => {
+          const cat = row.getAttribute('data-category');
+          if (selectedCat === 'all' || cat === selectedCat) {
+            row.style.display = '';
+            visibleCount++;
+          } else {
+            row.style.display = 'none';
+          }
+        });
+        
+        if (countBadgeProd) {
+          countBadgeProd.textContent = `${visibleCount} Productos`;
+        }
+      });
+    }
+  });
+</script>

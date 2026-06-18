@@ -1,0 +1,24 @@
+---
+import { SignIn } from "@clerk/astro/components";
+---
+
+<div class="flex min-h-screen items-center justify-center">
+  <SignIn
+    appearance={{
+      variables: {
+        colorPrimary: "#2563eb",
+        borderRadius: "0.5rem",
+      },
+      elements: {
+        card: "shadow-xl border border-gray-200",
+        headerTitle: "text-2xl font-bold text-gray-800",
+      },
+    }}
+  />
+</div>
+
+<style is:global>
+  .cl-footer {
+    display: none !important;
+  }
+</style>

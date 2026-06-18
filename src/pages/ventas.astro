@@ -1,0 +1,24 @@
+---
+import Layout from "../layouts/Layout.astro";
+import MetricsDashboard from "../components/MetricsDashboard.astro";
+import SalesChart from "../components/SalesChart.astro";
+import TicketsTable from "../components/TicketsTable.astro";
+---
+
+<Layout>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 mb-6">Rendimiento</h1>
+
+      <MetricsDashboard />
+
+      <div class="space-y-8">
+        <!-- Gráfico interactivo de ventas -->
+        <SalesChart />
+
+        <!-- Tabla de inventario que ya estaba lista -->
+        <TicketsTable />
+      </div>
+    </div>
+  </main>
+</Layout>

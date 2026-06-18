@@ -1,0 +1,312 @@
+---
+
+---
+
+<div
+  id="posi-chat-container"
+  class="fixed bottom-6 right-6 z-50 flex flex-col items-end"
+  transition:persist="posi-chat"
+>
+  <div
+    id="posi-window"
+    class="bg-white w-[350px] h-[500px] sm:w-[400px] shadow-2xl rounded-2xl border border-gray-200 flex flex-col overflow-hidden mb-4 transition-all duration-300 origin-bottom-right scale-0 opacity-0 pointer-events-none"
+  >
+    <div
+      class="bg-gradient-to-r from-blue-700 to-blue-900 p-4 flex items-center justify-between text-white shadow-md z-10"
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="w-10 h-10 rounded-full bg-white p-0.5 shadow-inner overflow-hidden flex-shrink-0"
+        >
+          <img
+            src="/IA.png"
+            alt="POSI"
+            class="w-full h-full object-cover rounded-full"
+            onerror="this.src='https://ui-avatars.com/api/?name=POSI&background=0D8ABC&color=fff'"
+          />
+        </div>
+        <div>
+          <h3 class="font-bold text-sm tracking-wide">POSI</h3>
+          <p class="text-[11px] text-blue-200">Analista de Datos de POSitive</p>
+        </div>
+      </div>
+      <button
+        id="posi-close-btn"
+        class="text-blue-200 hover:text-white transition-colors focus:outline-none p-1"
+      >
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          ><path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"></path></svg
+        >
+      </button>
+    </div>
+
+    <div
+      id="posi-messages"
+      class="flex-1 p-4 bg-slate-50 overflow-y-auto flex flex-col gap-4"
+    >
+      <!-- Los mensajes se inyectarán aquí -->
+    </div>
+
+    <div class="p-3 bg-white border-t border-gray-200 flex items-center gap-2">
+      <input
+        type="text"
+        id="posi-input"
+        class="flex-1 bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm rounded-full px-4 py-2.5 outline-none transition-all placeholder-gray-400"
+        placeholder="Pregúntale a POSI sobre tu negocio..."
+        autocomplete="off"
+      />
+      <button
+        id="posi-send-btn"
+        class="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2.5 w-10 h-10 flex items-center justify-center transition-colors shadow-md focus:outline-none flex-shrink-0 disabled:opacity-50"
+      >
+        <svg class="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 20 20"
+          ><path
+            d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"
+          ></path></svg
+        >
+      </button>
+    </div>
+  </div>
+
+  <button
+    id="posi-toggle-btn"
+    class="w-16 h-16 bg-white rounded-full shadow-[0_10px_25px_rgba(0,0,0,0.2)] border-[3px] border-blue-600 p-0.5 flex items-center justify-center hover:scale-105 transition-transform focus:outline-none group relative z-50"
+  >
+    <div
+      class="relative w-full h-full rounded-full overflow-hidden bg-blue-100"
+    >
+      <img
+        src="/IA.png"
+        alt="POSI"
+        class="w-full h-full object-cover"
+        onerror="this.src='https://ui-avatars.com/api/?name=POSI&background=0D8ABC&color=fff'"
+      />
+    </div>
+    <span
+      id="posi-badge"
+      class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white hidden"
+    ></span>
+  </button>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const toggleBtn = document.getElementById("posi-toggle-btn");
+    const closeBtn = document.getElementById("posi-close-btn");
+    const chatWindow = document.getElementById("posi-window");
+    const messagesContainer = document.getElementById("posi-messages");
+    const inputField = document.getElementById(
+      "posi-input",
+    ) as HTMLInputElement;
+    const sendBtn = document.getElementById(
+      "posi-send-btn",
+    ) as HTMLButtonElement;
+    const badge = document.getElementById("posi-badge");
+
+    let chatHistory = [];
+    let isOpen = false;
+    let isInitialized = false;
+
+    // Cargar historial de sessionStorage
+    const savedHistory = sessionStorage.getItem("posi_history");
+    if (savedHistory) {
+      chatHistory = JSON.parse(savedHistory);
+      isInitialized = true;
+      renderHistory();
+    }
+
+    // Funciones de UI
+    const toggleChat = () => {
+      isOpen = !isOpen;
+      if (isOpen) {
+        chatWindow.classList.remove(
+          "scale-0",
+          "opacity-0",
+          "pointer-events-none",
+        );
+        chatWindow.classList.add(
+          "scale-100",
+          "opacity-100",
+          "pointer-events-auto",
+        );
+        badge.classList.add("hidden");
+
+        // Si no está inicializado, hacer el fetch automático
+        if (!isInitialized) {
+          isInitialized = true;
+          sendToAPI("INIT_GREETING", true);
+        }
+
+        setTimeout(() => inputField.focus(), 300);
+      } else {
+        chatWindow.classList.add("scale-0", "opacity-0", "pointer-events-none");
+        chatWindow.classList.remove(
+          "scale-100",
+          "opacity-100",
+          "pointer-events-auto",
+        );
+      }
+    };
+
+    const scrollToBottom = () => {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    };
+
+    const addMessageToUI = (text, isUser) => {
+      const msgDiv = document.createElement("div");
+
+      // Sanitizar el texto básico y convertir saltos de línea
+      const formattedText = text
+        .replace(/\\n/g, "<br/>")
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+      if (isUser) {
+        msgDiv.className =
+          "self-end bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-[85%] shadow-sm";
+        msgDiv.innerHTML = formattedText;
+      } else {
+        msgDiv.className =
+          "self-start bg-white border border-gray-200 text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm max-w-[85%] shadow-sm leading-relaxed";
+        msgDiv.innerHTML = formattedText;
+      }
+
+      messagesContainer.appendChild(msgDiv);
+      scrollToBottom();
+    };
+
+    const showTyping = () => {
+      const typingDiv = document.createElement("div");
+      typingDiv.id = "posi-typing";
+      typingDiv.className =
+        "self-start bg-white border border-gray-200 text-gray-500 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm shadow-sm flex items-center gap-1";
+      typingDiv.innerHTML = `<span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span><span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></span><span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>`;
+      messagesContainer.appendChild(typingDiv);
+      scrollToBottom();
+    };
+
+    const hideTyping = () => {
+      const typingDiv = document.getElementById("posi-typing");
+      if (typingDiv) typingDiv.remove();
+    };
+
+    function renderHistory() {
+      messagesContainer.innerHTML = "";
+      try {
+        let isValid = true;
+        chatHistory.forEach((msg) => {
+          if (!msg || !msg.parts || !msg.parts[0] || !msg.role) isValid = false;
+          else addMessageToUI(msg.parts[0].text, msg.role === "user");
+        });
+        if (
+          chatHistory.length > 0 &&
+          chatHistory[chatHistory.length - 1].role !== "model"
+        ) {
+          isValid = false;
+        }
+        if (!isValid) throw new Error("Corrupt history");
+      } catch (e) {
+        console.warn("Reseteando historial corrupto de POSI...");
+        chatHistory = [];
+        sessionStorage.removeItem("posi_history");
+        messagesContainer.innerHTML = "";
+        isInitialized = false;
+      }
+    }
+
+    // Lógica de Comunicación
+    const sendToAPI = async (messageText, isHiddenGreeting = false) => {
+      if (!isHiddenGreeting) {
+        // Agregamos a la UI localmente primero
+        addMessageToUI(messageText, true);
+
+        // Formateamos para el historial de Gemini
+        chatHistory.push({
+          role: "user",
+          parts: [{ text: messageText }],
+        });
+      }
+
+      inputField.disabled = true;
+      sendBtn.disabled = true;
+      showTyping();
+
+      try {
+        const response = await fetch("/api/posi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: isHiddenGreeting ? "INIT_GREETING" : messageText,
+            history: isHiddenGreeting ? [] : chatHistory.slice(0, -1), // Enviamos el historial sin el último mensaje actual porque ya lo mandamos en 'message'
+          }),
+        });
+
+        const data = await response.json();
+        hideTyping();
+
+        if (response.ok && data.response) {
+          const aiResponse = data.response;
+          addMessageToUI(aiResponse, false);
+
+          if (!isHiddenGreeting) {
+            chatHistory.push({
+              role: "model",
+              parts: [{ text: aiResponse }],
+            });
+          } else {
+            // Si fue el primer saludo automático, inicializamos el historial con este par de mensajes
+            chatHistory = [
+              { role: "user", parts: [{ text: "INIT_GREETING" }] },
+              { role: "model", parts: [{ text: aiResponse }] },
+            ];
+          }
+
+          sessionStorage.setItem("posi_history", JSON.stringify(chatHistory));
+        } else {
+          addMessageToUI(
+            "Lo siento, tuve un problema analizando los datos. Error: " +
+              (data.error || "Desconocido"),
+            false,
+          );
+          if (!isHiddenGreeting) chatHistory.pop();
+          sessionStorage.setItem("posi_history", JSON.stringify(chatHistory));
+        }
+      } catch (err) {
+        hideTyping();
+        addMessageToUI(
+          "Lo siento, perdí conexión con la base de datos.",
+          false,
+        );
+        if (!isHiddenGreeting) chatHistory.pop();
+        sessionStorage.setItem("posi_history", JSON.stringify(chatHistory));
+      }
+
+      inputField.disabled = false;
+      sendBtn.disabled = false;
+      inputField.focus();
+    };
+
+    // Event Listeners
+    toggleBtn.addEventListener("click", toggleChat);
+    closeBtn.addEventListener("click", toggleChat);
+
+    const handleSend = () => {
+      const text = inputField.value.trim();
+      if (!text) return;
+      inputField.value = "";
+      sendToAPI(text);
+    };
+
+    sendBtn.addEventListener("click", handleSend);
+    inputField.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") handleSend();
+    });
+  });
+</script>

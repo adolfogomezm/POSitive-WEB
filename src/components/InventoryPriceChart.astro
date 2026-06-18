@@ -1,0 +1,177 @@
+---
+let inventory = [];
+let error = null;
+let uniqueProducts = [];
+
+try {
+  const res = await fetch("http://localhost:3000/api/inventory");
+  const data = await res.json();
+  if (data && data.ok) {
+    inventory = data.inventory || [];
+    
+    const pSet = new Set();
+    inventory.forEach((item) => {
+      if (item.productName) pSet.add(item.productName);
+    });
+    uniqueProducts = Array.from(pSet).sort();
+  }
+} catch (e) {
+  error = "No se pudo conectar con la API de inventario para el gráfico.";
+}
+---
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden p-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    <div>
+      <h3 class="text-lg font-bold text-gray-900">Histórico de Precios de Compra</h3>
+      <p class="text-sm text-gray-500">
+        Fluctuación del costo unitario en el tiempo
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <div>
+        <label for="price-product-filter" class="text-sm font-medium text-gray-700 mr-2">Producto:</label>
+        <select
+          id="price-product-filter"
+          class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none w-48 sm:w-64"
+        >
+          {uniqueProducts.length > 0 ? (
+            uniqueProducts.map((p) => <option value={p}>{p}</option>)
+          ) : (
+            <option value="">Sin productos</option>
+          )}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {
+    error ? (
+      <div class="text-red-500 text-center py-10">{error}</div>
+    ) : (
+      <div id="price-chart" class="w-full h-[300px]" />
+    )
+  }
+</div>
+
+<!-- Cargar ApexCharts desde CDN -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts" defer></script>
+
+<script define:vars={{ inventory, uniqueProducts }}>
+  document.addEventListener("astro:page-load", () => {
+    const initChart = () => {
+      if (typeof ApexCharts === "undefined") {
+        setTimeout(initChart, 100);
+        return;
+      }
+
+      const productSelect = document.getElementById("price-product-filter");
+      let chart;
+
+      const renderChart = () => {
+        if (!productSelect || !productSelect.value) return;
+        
+        const selectedProduct = productSelect.value;
+
+        // Filtrar inventario por el producto seleccionado
+        const productHistory = inventory.filter(item => item.productName === selectedProduct);
+        
+        // Ordenar por fecha cronológicamente
+        productHistory.sort((a, b) => new Date(a.purchaseDate) - new Date(b.purchaseDate));
+
+        const categories = productHistory.map(item => {
+          const d = new Date(item.purchaseDate);
+          return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        });
+        
+        const seriesData = productHistory.map(item => parseFloat(item.unitaryPrice));
+
+        const options = {
+          series: [
+            {
+              name: "Costo Unitario ($)",
+              data: seriesData,
+            },
+          ],
+          chart: {
+            type: "line",
+            height: 300,
+            fontFamily: "inherit",
+            toolbar: { show: false },
+            zoom: { enabled: false },
+          },
+          colors: ["#8b5cf6"], // Morado para distinguirlo del azul de ventas
+          dataLabels: { 
+            enabled: true,
+            formatter: function (val) {
+              return "$" + val.toFixed(2);
+            },
+            style: {
+              fontSize: '10px',
+              colors: ['#4b5563']
+            },
+            background: {
+              enabled: true,
+              foreColor: '#ffffff',
+              borderRadius: 2,
+              borderWidth: 0,
+            }
+          },
+          stroke: { curve: "stepline", width: 3 }, // stepline es genial para precios que se mantienen y luego cambian
+          markers: {
+            size: 5,
+            colors: ["#fff"],
+            strokeColors: "#8b5cf6",
+            strokeWidth: 2,
+            hover: { size: 7 }
+          },
+          xaxis: {
+            categories: categories.length > 0 ? categories : ["Sin datos"],
+            labels: {
+              style: { colors: "#6b7280", fontSize: "11px" },
+            },
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+          },
+          yaxis: {
+            labels: {
+              style: { colors: "#6b7280", fontSize: "12px" },
+              formatter: function(val) {
+                return "$" + val.toFixed(2);
+              }
+            },
+          },
+          tooltip: {
+            y: {
+              formatter: function (val) {
+                return "$" + val.toFixed(2);
+              }
+            }
+          },
+          grid: {
+            borderColor: "#f3f4f6",
+            strokeDashArray: 4,
+            yaxis: { lines: { show: true } },
+            xaxis: { lines: { show: true } },
+          },
+        };
+
+        if (chart) {
+          chart.destroy();
+        }
+
+        chart = new ApexCharts(document.querySelector("#price-chart"), options);
+        chart.render();
+      };
+
+      if (productSelect) {
+        productSelect.addEventListener("change", renderChart);
+      }
+      
+      renderChart();
+    };
+
+    initChart();
+  });
+</script>

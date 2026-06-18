@@ -1,0 +1,239 @@
+---
+let tickets = [];
+let error = null;
+
+try {
+  const res = await fetch("http://localhost:3000/api/tickets");
+  const data = await res.json();
+  if (data && data.ok) {
+    tickets = data.tickets || [];
+  }
+} catch (e) {
+  error = "No se pudo conectar con la API de tickets para el gráfico.";
+}
+
+// Extraer categorías únicas para el selector del gráfico
+const catSet = new Set();
+tickets.forEach((ticket) => {
+  if (ticket.products) {
+    ticket.products.forEach((p) => {
+      if (p.categoryName) catSet.add(p.categoryName);
+    });
+  }
+});
+const uniqueCategories = Array.from(catSet);
+---
+
+<div
+  class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden p-6"
+>
+  <div
+    class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4"
+  >
+    <div>
+      <h3 class="text-lg font-bold text-gray-900">Desempeño de Ventas</h3>
+      <p class="text-sm text-gray-500">
+        Tendencia a lo largo del tiempo
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <div>
+        <label for="chart-metric-filter" class="sr-only">Métrica</label>
+        <select
+          id="chart-metric-filter"
+          class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none"
+        >
+          <option value="quantity">Artículos vendidos</option>
+          <option value="revenue">Ingresos ($)</option>
+        </select>
+      </div>
+      <div>
+        <label for="chart-time-filter" class="sr-only">Tiempo</label>
+        <select
+          id="chart-time-filter"
+          class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none"
+        >
+          <option value="all">Todo el tiempo</option>
+          <option value="today">Hoy</option>
+          <option value="week">Última Semana</option>
+        </select>
+      </div>
+      <div>
+        <label for="chart-category-filter" class="sr-only">Categoría</label>
+        <select
+          id="chart-category-filter"
+          class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none"
+        >
+          <option value="all">Todas las categorías</option>
+          {uniqueCategories.map((cat) => <option value={cat}>{cat}</option>)}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {
+    error ? (
+      <div class="text-red-500 text-center py-10">{error}</div>
+    ) : (
+      <div id="sales-chart" class="w-full h-[300px]" />
+    )
+  }
+</div>
+
+<!-- Cargar ApexCharts desde CDN de manera diferida -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts" defer></script>
+
+<script define:vars={{ tickets }}>
+  // Esperar a que el DOM y ApexCharts estén listos
+  document.addEventListener("astro:page-load", () => {
+    // Helper function para inicializar el chart una vez cargado el script
+    const initChart = () => {
+      if (typeof ApexCharts === "undefined") {
+        setTimeout(initChart, 100);
+        return;
+      }
+
+      const metricSelect = document.getElementById("chart-metric-filter");
+      const timeSelect = document.getElementById("chart-time-filter");
+      const catSelect = document.getElementById("chart-category-filter");
+      let chart;
+
+      const renderChart = () => {
+        const metricFilter = metricSelect.value;
+        const timeFilter = timeSelect.value;
+        const catFilter = catSelect.value;
+
+        // Agrupar ventas por fecha
+        const salesByDate = {};
+
+        tickets.forEach((ticket) => {
+          const ticketDate = new Date(ticket.created_at);
+
+          // Filtro de tiempo básico
+          const now = new Date();
+          if (timeFilter === "today") {
+            if (ticketDate.toDateString() !== now.toDateString()) return;
+          } else if (timeFilter === "week") {
+            const oneWeekAgo = new Date(
+              now.getTime() - 7 * 24 * 60 * 60 * 1000,
+            );
+            if (ticketDate < oneWeekAgo) return;
+          }
+
+          const dateKey = ticketDate.toLocaleDateString();
+
+          if (ticket.products) {
+            ticket.products.forEach((p) => {
+              // Filtro de categoría
+              if (catFilter !== "all" && p.categoryName !== catFilter) return;
+
+              if (!salesByDate[dateKey]) {
+                salesByDate[dateKey] = 0;
+              }
+              
+              if (metricFilter === "quantity") {
+                salesByDate[dateKey] += p.quantity;
+              } else {
+                salesByDate[dateKey] += parseFloat(p.total || 0);
+              }
+            });
+          }
+        });
+
+        // Ordenar fechas cronológicamente
+        const sortedDates = Object.keys(salesByDate).sort((a, b) => {
+          return new Date(a) - new Date(b);
+        });
+
+        const seriesData = sortedDates.map((date) => {
+          return metricFilter === "quantity" 
+            ? salesByDate[date] 
+            : Number(salesByDate[date].toFixed(2));
+        });
+
+        const seriesName = metricFilter === "quantity" ? "Artículos Vendidos" : "Ingresos Generados";
+
+        const options = {
+          series: [
+            {
+              name: seriesName,
+              data: seriesData,
+            },
+          ],
+          chart: {
+            type: "area",
+            height: 300,
+            fontFamily: "inherit",
+            toolbar: { show: false },
+            zoom: { enabled: false },
+          },
+          colors: ["#2563eb"],
+          fill: {
+            type: "gradient",
+            gradient: {
+              shadeIntensity: 1,
+              opacityFrom: 0.4,
+              opacityTo: 0.05,
+              stops: [0, 100],
+            },
+          },
+          dataLabels: { enabled: false },
+          stroke: { curve: "smooth", width: 2 },
+          xaxis: {
+            categories: sortedDates.length > 0 ? sortedDates : ["Sin datos"],
+            labels: {
+              style: { colors: "#6b7280", fontSize: "12px" },
+            },
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+          },
+          yaxis: {
+            labels: {
+              style: { colors: "#6b7280", fontSize: "12px" },
+              formatter: function(val) {
+                if (metricFilter === 'revenue') {
+                  return "$" + val.toLocaleString('es-MX', { minimumFractionDigits: 2 });
+                }
+                return val;
+              }
+            },
+          },
+          tooltip: {
+            y: {
+              formatter: function (val) {
+                if (metricFilter === 'revenue') {
+                  return "$" + val.toLocaleString('es-MX', { minimumFractionDigits: 2 });
+                }
+                return val + " artículos";
+              }
+            }
+          },
+          grid: {
+            borderColor: "#f3f4f6",
+            strokeDashArray: 4,
+            yaxis: { lines: { show: true } },
+            xaxis: { lines: { show: false } },
+          },
+        };
+
+        if (chart) {
+          chart.destroy();
+        }
+
+        chart = new ApexCharts(document.querySelector("#sales-chart"), options);
+        chart.render();
+      };
+
+      // Listeners
+      metricSelect.addEventListener("change", renderChart);
+      timeSelect.addEventListener("change", renderChart);
+      catSelect.addEventListener("change", renderChart);
+
+      // Render inicial
+      renderChart();
+    };
+
+    initChart();
+  });
+</script>

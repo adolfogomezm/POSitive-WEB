@@ -1,0 +1,29 @@
+---
+import Layout from "../layouts/Layout.astro";
+import ProductMetrics from "../components/ProductMetrics.astro";
+import InventoryPriceChart from "../components/InventoryPriceChart.astro";
+import ProductSalesTable from "../components/ProductSalesTable.astro";
+import ProductsTable from "../components/ProductsTable.astro";
+---
+
+<Layout>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 mb-6">Dashboard de Productos e Inventario</h1>
+
+      <!-- Cuadritos de métricas estilo dashboard -->
+      <ProductMetrics />
+
+      <div class="space-y-8">
+        <!-- Gráfica de fluctuación de precios de compra -->
+        <InventoryPriceChart />
+        
+        <!-- Tabla del catálogo de inventario general -->
+        <ProductsTable />
+
+        <!-- Tabla detallada de salidas/ventas de productos -->
+        <ProductSalesTable />
+      </div>
+    </div>
+  </main>
+</Layout>

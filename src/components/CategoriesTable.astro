@@ -1,0 +1,50 @@
+---
+let categorys = [];
+let error = null;
+
+try {
+  const res = await fetch('http://localhost:3000/api/category');
+  const data = await res.json();
+  if (data && data.ok) {
+    categorys = data.categorys || [];
+  }
+} catch (e) {
+  error = 'No se pudo conectar con la API de categorías.';
+}
+---
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+  <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+    <h3 class="text-lg font-medium text-gray-900">Categorías</h3>
+    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">{categorys.length} Total</span>
+  </div>
+  
+  {error ? (
+    <div class="p-6 text-center text-red-500">{error}</div>
+  ) : categorys.length === 0 ? (
+    <div class="p-6 text-center text-gray-500">No hay categorías disponibles.</div>
+  ) : (
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+          <tr>
+            <th scope="col" class="px-6 py-3">ID Categoría</th>
+            <th scope="col" class="px-6 py-3">Nombre</th>
+          </tr>
+        </thead>
+        <tbody>
+          {categorys.map((cat) => (
+            <tr class="border-b border-gray-200 hover:bg-gray-50">
+              <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                #{cat.idCategory}
+              </td>
+              <td class="px-6 py-4">
+                {cat.name}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</div>
