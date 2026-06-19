@@ -6,8 +6,8 @@ let error = null;
 
 try {
   const [resProducts, resCategories] = await Promise.all([
-    fetch('http://localhost:3000/api/products'),
-    fetch('http://localhost:3000/api/category')
+    fetch(`${import.meta.env.PUBLIC_API_URL}/api/products`),
+    fetch(`${import.meta.env.PUBLIC_API_URL}/api/category`)
   ]);
   
   const dataProd = await resProducts.json();

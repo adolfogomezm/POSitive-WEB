@@ -7,9 +7,9 @@ export const POST = async ({ request }) => {
 
     // Recolectar datos del negocio para el contexto de la IA
     const [resInv, resTick, resProd] = await Promise.all([
-      fetch("http://localhost:3000/api/inventory").catch(() => null),
-      fetch("http://localhost:3000/api/tickets").catch(() => null),
-      fetch("http://localhost:3000/api/products").catch(() => null),
+      fetch(`${import.meta.env.PUBLIC_API_URL}/api/inventory`).catch(() => null),
+      fetch(`${import.meta.env.PUBLIC_API_URL}/api/tickets`).catch(() => null),
+      fetch(`${import.meta.env.PUBLIC_API_URL}/api/products`).catch(() => null),
     ]);
 
     let inventory = [], tickets = [], products = [];

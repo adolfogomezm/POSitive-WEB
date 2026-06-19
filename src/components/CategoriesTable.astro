@@ -3,7 +3,7 @@ let categorys = [];
 let error = null;
 
 try {
-  const res = await fetch('http://localhost:3000/api/category');
+  const res = await fetch(`${import.meta.env.PUBLIC_API_URL}/api/category`);
   const data = await res.json();
   if (data && data.ok) {
     categorys = data.categorys || [];

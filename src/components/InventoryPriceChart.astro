@@ -4,7 +4,7 @@ let error = null;
 let uniqueProducts = [];
 
 try {
-  const res = await fetch("http://localhost:3000/api/inventory");
+  const res = await fetch(`${import.meta.env.PUBLIC_API_URL}/api/inventory`);
   const data = await res.json();
   if (data && data.ok) {
     inventory = data.inventory || [];

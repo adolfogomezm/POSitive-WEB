@@ -5,8 +5,8 @@ let error = null;
 
 try {
   const [resInv, resTick] = await Promise.all([
-    fetch("http://localhost:3000/api/inventory"),
-    fetch("http://localhost:3000/api/tickets")
+    fetch(`${import.meta.env.PUBLIC_API_URL}/api/inventory`),
+    fetch(`${import.meta.env.PUBLIC_API_URL}/api/tickets`)
   ]);
   const dataInv = await resInv.json();
   const dataTick = await resTick.json();

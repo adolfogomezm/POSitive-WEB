@@ -5,12 +5,12 @@ let error = null;
 
 try {
   const [resInv, resProd] = await Promise.all([
-    fetch("http://localhost:3000/api/inventory"),
-    fetch("http://localhost:3000/api/products")
+    fetch(`${import.meta.env.PUBLIC_API_URL}/api/inventory`),
+    fetch(`${import.meta.env.PUBLIC_API_URL}/api/products`),
   ]);
   const dataInv = await resInv.json();
   const dataProd = await resProd.json();
-  
+
   if (dataInv && dataInv.ok) inventory = dataInv.inventory || [];
   if (dataProd && dataProd.ok) products = dataProd.products || [];
 } catch (e) {
@@ -22,13 +22,13 @@ threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
 // Calcular costo más alto de los últimos 3 meses por producto
 const costMap = {};
-inventory.forEach(inv => {
+inventory.forEach((inv) => {
   const invDate = new Date(inv.purchaseDate);
   const name = inv.productName;
   const price = parseFloat(inv.unitaryPrice);
-  
+
   if (!costMap[name]) costMap[name] = { cost: price, date: invDate };
-  
+
   // Si está dentro de los últimos 3 meses y es mayor al que teníamos registrado
   if (invDate >= threeMonthsAgo) {
     if (price > costMap[name].cost) {
@@ -38,19 +38,19 @@ inventory.forEach(inv => {
   }
 });
 
-const profitData = products.map(p => {
+const profitData = products.map((p) => {
   const name = p.name;
   const salePrice = parseFloat(p.price);
   const cost = costMap[name] ? costMap[name].cost : 0;
   const absoluteProfit = salePrice - cost;
   const margin = salePrice > 0 ? (absoluteProfit / salePrice) * 100 : 0;
-  
+
   return {
     name,
     cost,
     salePrice,
     absoluteProfit,
-    margin
+    margin,
   };
 });
 
@@ -58,107 +58,135 @@ const profitData = products.map(p => {
 profitData.sort((a, b) => b.absoluteProfit - a.absoluteProfit);
 ---
 
-<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-  <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-    <h3 class="text-lg font-medium text-gray-900">Análisis de Ganancias por Producto</h3>
-    <span class="text-sm text-gray-500">Costo calculado: Más alto últimos 3 meses</span>
+<div
+  class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
+>
+  <div
+    class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center"
+  >
+    <h3 class="text-lg font-medium text-gray-900">
+      Análisis de Ganancias por Producto
+    </h3>
+    <span class="text-sm text-gray-500"
+      >Costo calculado: Más alto últimos 3 meses</span
+    >
   </div>
-  
-  {error ? (
-    <div class="p-6 text-center text-red-500">{error}</div>
-  ) : profitData.length === 0 ? (
-    <div class="p-6 text-center text-gray-500">No hay productos suficientes para calcular ganancias.</div>
-  ) : (
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm text-left text-gray-600" id="profit-table">
-        <thead class="text-xs text-gray-700 uppercase bg-gray-100 shadow-sm select-none">
-          <tr>
-            <th class="px-6 py-3 cursor-pointer sort-header hover:bg-gray-200 transition-colors" data-col="name">
-              Producto <span class="sort-icon text-gray-400 ml-1 text-[10px]">↕</span>
-            </th>
-            <th class="px-6 py-3 text-right">Costo (3 Meses)</th>
-            <th class="px-6 py-3 text-right">Precio Venta</th>
-            <th class="px-6 py-3 text-right cursor-pointer sort-header hover:bg-gray-200 transition-colors group" data-col="profit">
-              Ganancia Neta <span class="sort-icon text-gray-400 ml-1 text-[10px]">↕</span>
-            </th>
-            <th class="px-6 py-3 text-right cursor-pointer sort-header hover:bg-gray-200 transition-colors group" data-col="margin">
-              Margen % <span class="sort-icon text-gray-400 ml-1 text-[10px]">↕</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody id="profit-tbody">
-          {profitData.map((d) => (
-            <tr 
-              class="border-b border-gray-200 hover:bg-gray-50 transition-colors" 
-              data-name={d.name} 
-              data-profit={d.absoluteProfit} 
-              data-margin={d.margin}
-            >
-              <td class="px-6 py-4 font-medium text-gray-900">
-                {d.name}
-              </td>
-              <td class="px-6 py-4 text-right text-gray-500">
-                ${d.cost.toFixed(2)}
-              </td>
-              <td class="px-6 py-4 text-right text-gray-500">
-                ${d.salePrice.toFixed(2)}
-              </td>
-              <td class={`px-6 py-4 text-right font-bold ${d.absoluteProfit > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                ${d.absoluteProfit.toFixed(2)}
-              </td>
-              <td class="px-6 py-4 text-right">
-                <span class={`px-2.5 py-1 rounded-full text-xs font-semibold ${d.margin >= 30 ? 'bg-green-100 text-green-800' : d.margin > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                  {d.margin.toFixed(1)}%
-                </span>
-              </td>
+
+  {
+    error ? (
+      <div class="p-6 text-center text-red-500">{error}</div>
+    ) : profitData.length === 0 ? (
+      <div class="p-6 text-center text-gray-500">
+        No hay productos suficientes para calcular ganancias.
+      </div>
+    ) : (
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left text-gray-600" id="profit-table">
+          <thead class="text-xs text-gray-700 uppercase bg-gray-100 shadow-sm select-none">
+            <tr>
+              <th
+                class="px-6 py-3 cursor-pointer sort-header hover:bg-gray-200 transition-colors"
+                data-col="name"
+              >
+                Producto{" "}
+                <span class="sort-icon text-gray-400 ml-1 text-[10px]">↕</span>
+              </th>
+              <th class="px-6 py-3 text-right">Costo (3 Meses)</th>
+              <th class="px-6 py-3 text-right">Precio Venta</th>
+              <th
+                class="px-6 py-3 text-right cursor-pointer sort-header hover:bg-gray-200 transition-colors group"
+                data-col="profit"
+              >
+                Ganancia Neta{" "}
+                <span class="sort-icon text-gray-400 ml-1 text-[10px]">↕</span>
+              </th>
+              <th
+                class="px-6 py-3 text-right cursor-pointer sort-header hover:bg-gray-200 transition-colors group"
+                data-col="margin"
+              >
+                Margen %{" "}
+                <span class="sort-icon text-gray-400 ml-1 text-[10px]">↕</span>
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )}
+          </thead>
+          <tbody id="profit-tbody">
+            {profitData.map((d) => (
+              <tr
+                class="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+                data-name={d.name}
+                data-profit={d.absoluteProfit}
+                data-margin={d.margin}
+              >
+                <td class="px-6 py-4 font-medium text-gray-900">{d.name}</td>
+                <td class="px-6 py-4 text-right text-gray-500">
+                  ${d.cost.toFixed(2)}
+                </td>
+                <td class="px-6 py-4 text-right text-gray-500">
+                  ${d.salePrice.toFixed(2)}
+                </td>
+                <td
+                  class={`px-6 py-4 text-right font-bold ${d.absoluteProfit > 0 ? "text-green-600" : "text-red-600"}`}
+                >
+                  ${d.absoluteProfit.toFixed(2)}
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <span
+                    class={`px-2.5 py-1 rounded-full text-xs font-semibold ${d.margin >= 30 ? "bg-green-100 text-green-800" : d.margin > 0 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}`}
+                  >
+                    {d.margin.toFixed(1)}%
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 </div>
 
 <script>
-  document.addEventListener('astro:page-load', () => {
-    const headers = document.querySelectorAll('.sort-header');
-    const tbody = document.getElementById('profit-tbody');
-    
-    if (!tbody) return; // Salir si el elemento no está en el DOM actual
+  document.addEventListener("astro:page-load", () => {
+    const headers = document.querySelectorAll(".sort-header");
+    const tbody = document.getElementById("profit-tbody");
 
-    let sortCol = 'profit';
+    if (!tbody) return;
+
+    let sortCol = "profit";
     let sortDesc = true;
-    
-    headers.forEach(header => {
+
+    headers.forEach((header) => {
       // Remover listener previo para evitar duplicados si astro lo ejecuta varias veces
       const newHeader = header.cloneNode(true);
       header.parentNode.replaceChild(newHeader, header);
-      
-      newHeader.addEventListener('click', () => {
-        const col = newHeader.getAttribute('data-col');
+
+      newHeader.addEventListener("click", () => {
+        const col = newHeader.getAttribute("data-col");
         if (sortCol === col) {
           sortDesc = !sortDesc;
         } else {
           sortCol = col;
           sortDesc = true;
         }
-        
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-        
+
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+
         rows.sort((a, b) => {
           let valA, valB;
-          if (col === 'name') {
-            valA = a.getAttribute('data-name');
-            valB = b.getAttribute('data-name');
-            return sortDesc ? valB.localeCompare(valA) : valA.localeCompare(valB);
+          if (col === "name") {
+            valA = a.getAttribute("data-name");
+            valB = b.getAttribute("data-name");
+            return sortDesc
+              ? valB.localeCompare(valA)
+              : valA.localeCompare(valB);
           } else {
             valA = parseFloat(a.getAttribute(`data-${col}`));
             valB = parseFloat(b.getAttribute(`data-${col}`));
             return sortDesc ? valB - valA : valA - valB;
           }
         });
-        
-        rows.forEach(row => tbody.appendChild(row));
+
+        rows.forEach((row) => tbody.appendChild(row));
       });
     });
   });

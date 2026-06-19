@@ -5,8 +5,8 @@ let error = null;
 
 try {
   const [resInv, resProd] = await Promise.all([
-    fetch("http://localhost:3000/api/inventory"),
-    fetch("http://localhost:3000/api/products")
+    fetch(`${import.meta.env.PUBLIC_API_URL}/api/inventory`),
+    fetch(`${import.meta.env.PUBLIC_API_URL}/api/products`)
   ]);
   const dataInv = await resInv.json();
   const dataProd = await resProd.json();
